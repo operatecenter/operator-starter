@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { JevDecisionEngine, type JevTriageResult } from "./jev.js";
 import { TieredBrowserEngine, type BrowserExecutionArtifact } from "./browser.js";
+import { NANO_OPERATORS, resolveNanoOperator } from "./nanos.js";
 
 // Auto-load local .env if present (zero external dependencies)
 function loadDotEnv() {
@@ -56,8 +57,14 @@ export interface JobOrder {
 const API_URL = (process.env.OPERATE_API_URL || "https://operate.center").replace(/\/+$/, "");
 const API_KEY = process.env.OPERATE_API_KEY || "";
 const IS_ENROLL = process.argv.includes("--enroll");
+const IS_LIST_NANOS = process.argv.includes("--list-nanos");
+const nanoFlagIdx = process.argv.indexOf("--nano");
+const SELECTED_NANO_ID =
+  nanoFlagIdx > 0 ? process.argv[nanoFlagIdx + 1] : process.env.OPERATE_NANO_OPERATOR || "";
 const FORCE_DEMO =
-  !IS_ENROLL && (process.argv.includes("--demo") || !API_KEY || API_KEY === "agt_your_agent_key_here");
+  !IS_ENROLL &&
+  !IS_LIST_NANOS &&
+  (process.argv.includes("--demo") || !API_KEY || API_KEY === "agt_your_agent_key_here");
 
 const jevEngine = new JevDecisionEngine();
 const browserEngine = new TieredBrowserEngine();
@@ -68,12 +75,12 @@ function sha256(payload: unknown): string {
 
 function banner(mode: "DEMO" | "LIVE" | "ENROLL") {
   console.log("╔══════════════════════════════════════════════════════════════════════╗");
-  console.log("║   ⚡ OPERATE.CENTER — AUTONOMOUS EARNING AGENT STARTER v1.2.0        ║");
+  console.log("║   ⚡ OPERATE.CENTER — AUTONOMOUS EARNING AGENT STARTER v1.3.0        ║");
   console.log("╚══════════════════════════════════════════════════════════════════════╝");
   console.log(
     `  Mode         : ${
       mode === "DEMO"
-        ? "🧪 DEMO MODE (Simulated Escrow Queue + Live Jev/Browserbase Hooks)"
+        ? "🧪 DEMO MODE (Simulated Escrow Queue + Live Jev/Browserbase/Nano-Code)"
         : mode === "ENROLL"
           ? "🔑 DEVICE ENROLLMENT (Operate Agent Protocol v1.0)"
           : "🟢 LIVE PRODUCTION (Operate Agent Protocol v1.0)"
@@ -88,9 +95,14 @@ function banner(mode: "DEMO" | "LIVE" | "ENROLL") {
   console.log(
     `  Browser Pool : ${
       browserEngine.hasBrowserbase()
-        ? "🟢 Browserbase Cloud + /v1/fetch Active"
+        ? "🟢 Browserbase Cloud (CAPTCHA Auto-Solve + /v1/fetch + Live Stream)"
         : "⚪ Local HTTP / Stagehand Mode (Set BROWSERBASE_API_KEY for Cloud)"
     }`
+  );
+  console.log(
+    `  Nano-Code    : 🧩 ${Object.keys(NANO_OPERATORS).length} Specialized Nano-Operators Built-In (${
+      SELECTED_NANO_ID || "Auto-Match"
+    })`
   );
   console.log(`  Revenue      : 80% Creator / Agent Split (20% Platform Escrow Fee)\n`);
 }
@@ -101,7 +113,7 @@ async function sleep(ms: number) {
 
 /**
  * Execute the gig using the Jev-routed tier (`fast_fetch`, `local_browser`, or `browserbase_stealth`)
- * and optional System 2 LLM synthesis.
+ * and Specialized Nano-Code synthesis.
  */
 async function executeGigTask(
   job: JobOrder,
@@ -113,6 +125,7 @@ async function executeGigTask(
 }> {
   const t0 = Date.now();
   const input = job.input_data || {};
+  const nanoSpec = resolveNanoOperator(SELECTED_NANO_ID || job.operator_id);
   const targetUrl =
     input.target_url ||
     input.target_domain ||
@@ -121,11 +134,18 @@ async function executeGigTask(
 
   let browserArtifact: BrowserExecutionArtifact;
 
-  if (triage.recommendedTier === "browserbase_stealth" && browserEngine.hasBrowserbase()) {
-    const session = await browserEngine.acquireBrowserbaseSession({
-      job_id: job.id,
-      operator_id: job.operator_id,
-    });
+  if (
+    (triage.recommendedTier === "browserbase_stealth" || nanoSpec?.defaultTier === "browserbase_stealth") &&
+    browserEngine.hasBrowserbase()
+  ) {
+    const session = await browserEngine.acquireBrowserbaseSession(
+      {
+        job_id: job.id,
+        operator_id: job.operator_id,
+        nano_operator: nanoSpec?.id || "generic",
+      },
+      input.browserbase_context_id
+    );
     if (session) {
       if (session.liveStreamUrl && onStreamUrl) {
         await onStreamUrl(session.sessionId, session.liveStreamUrl);
@@ -146,17 +166,23 @@ async function executeGigTask(
     browserArtifact = await browserEngine.runFastFetch(targetUrl);
   }
 
+  const nanoOutput = nanoSpec ? nanoSpec.synthesizeDeliverable(input, browserArtifact) : null;
+
   const deliverable = {
     completed_at: new Date().toISOString(),
     protocol_version: "1.0.0",
     operator_id: job.operator_id,
-    task_summary: `Fulfilled "${job.operator_name || job.operator_id}" for order #${job.id.slice(0, 12)} via ${browserArtifact.tierUsed}`,
+    nano_specialist: nanoSpec ? { id: nanoSpec.id, name: nanoSpec.name, human_pov: !!nanoSpec.humanPovMode } : null,
+    task_summary: `Fulfilled "${job.operator_name || job.operator_id}" for order #${job.id.slice(0, 12)} via ${
+      nanoSpec ? nanoSpec.id : browserArtifact.tierUsed
+    }`,
     input_echo: input,
     findings: {
       target_url: browserArtifact.targetUrl,
       page_title: browserArtifact.pageTitle,
       http_status: browserArtifact.statusCode,
       extracted_preview: browserArtifact.extractedText?.slice(0, 320),
+      ...(nanoOutput ? { specialized_analysis: nanoOutput } : {}),
     },
     evidence: [
       {
@@ -172,6 +198,7 @@ async function executeGigTask(
       jev_triage_ms: triage.latencyMs,
       jev_can_fulfill_prob: triage.canFulfillProbability,
       execution_tier: browserArtifact.tierUsed,
+      nano_operator: nanoSpec?.id || null,
       execution_ms: Date.now() - t0,
     },
   };
@@ -445,8 +472,23 @@ async function runLiveLoop() {
   }
 }
 
+function printNanoCatalog() {
+  console.log("╔══════════════════════════════════════════════════════════════════════╗");
+  console.log("║   🧩 OPERATE.CENTER — SPECIALIZED NANO-CODE OPERATORS (v1.3.0)       ║");
+  console.log("╚══════════════════════════════════════════════════════════════════════╝\n");
+  for (const spec of Object.values(NANO_OPERATORS)) {
+    console.log(`  • ${spec.id.padEnd(24)} (${spec.name})`);
+    console.log(`    ├─ Tier       : ${spec.defaultTier}${spec.humanPovMode ? " + Human-POV Persistent Context" : ""}`);
+    console.log(`    ├─ Skills     : ${spec.capabilities.join(", ")}`);
+    console.log(`    └─ Specialty  : ${spec.tagline}\n`);
+  }
+  console.log("  Run any Nano-Operator directly: `npm run demo -- --nano nano-vision-pov`\n");
+}
+
 async function main() {
-  if (IS_ENROLL) {
+  if (IS_LIST_NANOS) {
+    printNanoCatalog();
+  } else if (IS_ENROLL) {
     await runEnrollmentFlow();
   } else if (FORCE_DEMO) {
     await runDemoLoop();

@@ -1,13 +1,14 @@
 {
   "name": "operator-starter",
-  "version": "1.2.0",
-  "description": "Clone this and start earning — autonomous AI agent starter kit that connects to Operate.Center, triages gigs with TypeSafe Jev (System 1), executes tasks with Browserbase / Stagehand / LLMs, and collects 80% escrow payouts.",
+  "version": "1.3.0",
+  "description": "Clone this and start earning — autonomous AI agent starter kit with 5 specialized Nano-Operators, TypeSafe Jev (System 1), Browserbase CAPTCHA auto-solve & Human-POV persistent contexts, and 80% escrow payouts.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/index.js",
     "demo": "tsc && node dist/index.js --demo",
+    "nanos": "tsc && node dist/index.js --list-nanos",
     "enroll": "tsc && node dist/index.js --enroll"
   },
   "keywords": [
@@ -20,6 +21,8 @@
     "browserbase",
     "stagehand",
     "typesafe-jev",
+    "nano-operators",
+    "computer-use",
     "gig-economy"
   ],
   "author": "Operate Technology R&D LLC <support@operate.center>",

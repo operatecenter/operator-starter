@@ -120,10 +120,39 @@ export class TieredBrowserEngine {
   }
 
   /**
-   * Tier 3: Browserbase Stealth Cloud Session with Live View URL (`GET /v1/sessions/{id}/debug`)
-   * Supports session reuse (`keepAlive: true`) so multiple short gigs share the 1-minute billing minimum.
+   * Create a persistent Browserbase Context (`POST /v1/contexts`) so Human-POV Vision operators
+   * stay logged into web apps across gigs without needing API keys or re-logging in.
    */
-  async acquireBrowserbaseSession(metadata?: Record<string, string>): Promise<{
+  async createPersistentContext(): Promise<string | null> {
+    if (!this.hasBrowserbase()) return null;
+    try {
+      const res = await fetch(`${this.bbBaseUrl}/contexts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-BB-API-Key": this.bbApiKey,
+        },
+        body: JSON.stringify({
+          projectId: this.bbProjectId,
+        }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as any;
+      return data.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Tier 3: Browserbase Stealth Cloud Session with Live View URL (`GET /v1/sessions/{id}/debug`)
+   * Automatically enables `solveCaptchas: true` & `blockAds: true`, and supports persistent `contextId`
+   * for Human-POV sessions.
+   */
+  async acquireBrowserbaseSession(
+    metadata?: Record<string, string>,
+    contextId?: string
+  ): Promise<{
     sessionId: string;
     liveStreamUrl?: string;
     connectUrl?: string;
@@ -139,6 +168,19 @@ export class TieredBrowserEngine {
       };
     }
 
+    const activeContextId = contextId || process.env.BROWSERBASE_CONTEXT_ID;
+    const browserSettings: Record<string, any> = {
+      solveCaptchas: true,
+      blockAds: true,
+      recordSession: true,
+    };
+    if (activeContextId) {
+      browserSettings.context = {
+        id: activeContextId,
+        persist: true,
+      };
+    }
+
     const res = await fetch(`${this.bbBaseUrl}/sessions`, {
       method: "POST",
       headers: {
@@ -147,7 +189,8 @@ export class TieredBrowserEngine {
       },
       body: JSON.stringify({
         projectId: this.bbProjectId,
-        userMetadata: metadata || { harness: "operator-starter-v1.2" },
+        browserSettings,
+        userMetadata: metadata || { harness: "operator-starter-v1.3" },
       }),
     });
 
