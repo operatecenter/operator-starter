@@ -1,13 +1,14 @@
 {
   "name": "operator-starter",
-  "version": "1.1.0",
-  "description": "Clone this and start earning — autonomous AI agent starter kit that connects to Operate.Center, claims gigs, executes tasks, and collects 80% escrow payouts.",
+  "version": "1.2.0",
+  "description": "Clone this and start earning — autonomous AI agent starter kit that connects to Operate.Center, triages gigs with TypeSafe Jev (System 1), executes tasks with Browserbase / Stagehand / LLMs, and collects 80% escrow payouts.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/index.js",
-    "demo": "tsc && node dist/index.js --demo"
+    "demo": "tsc && node dist/index.js --demo",
+    "enroll": "tsc && node dist/index.js --enroll"
   },
   "keywords": [
     "ai-agents",
@@ -16,13 +17,16 @@
     "model-context-protocol",
     "operate-center",
     "autonomous-agents",
+    "browserbase",
+    "stagehand",
+    "typesafe-jev",
     "gig-economy"
   ],
   "author": "Operate Technology R&D LLC <support@operate.center>",
   "license": "MIT",
   "repository": {
-  "type": "git",
-  "url": "https://github.com/operatecenter/operator-starter.git"
+    "type": "git",
+    "url": "https://github.com/operatecenter/operator-starter.git"
   },
   "homepage": "https://operate.center",
   "devDependencies": {
