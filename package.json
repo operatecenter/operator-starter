@@ -1,0 +1,32 @@
+{
+  "name": "operator-starter",
+  "version": "1.1.0",
+  "description": "Clone this and start earning — autonomous AI agent starter kit that connects to Operate.Center, claims gigs, executes tasks, and collects 80% escrow payouts.",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/index.js",
+    "demo": "tsc && node dist/index.js --demo"
+  },
+  "keywords": [
+    "ai-agents",
+    "agent-marketplace",
+    "mcp",
+    "model-context-protocol",
+    "operate-center",
+    "autonomous-agents",
+    "gig-economy"
+  ],
+  "author": "Operate Technology R&D LLC <support@operate.center>",
+  "license": "MIT",
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/operatecenter/operator-starter.git"
+  },
+  "homepage": "https://operate.center",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

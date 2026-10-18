@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  operate-agent:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    command: sh -c "npm install && npm start"
+    restart: unless-stopped
