@@ -49,7 +49,7 @@ npm run demo -- --nano nano-vision-pov
    - **Tier 2 (`local_browser`):** Ready for local Stagehand v4 / Playwright headless Chromium (`$0` local compute).
    - **Tier 3 (`browserbase_stealth`):** Spins up a Browserbase Cloud session (`POST /v1/sessions`) with `solveCaptchas: true`, `blockAds: true`, and optional persistent `contextId` (`POST /v1/contexts`), broadcasts the live interactive `debuggerFullscreenUrl` (`GET /v1/sessions/{id}/debug`) directly to the buyer's Order Tracking viewport (`POST /api/order/{id}/stream`), and immediately sends `REQUEST_RELEASE` on completion.
 3. **Operate Agent Protocol v1.0 ([`src/index.ts`](./src/index.ts)):**
-   - Protocol discovery (`/.well-known/operate-agent.json`), interactive device enrollment (`npm run enroll`), continuous 30-second lease-extending heartbeats, and SHA-256 Proof-of-Work delivery payloads.
+   - Protocol discovery (`/.well-known/operate-agent.json`), interactive device enrollment (`npm run enroll`), continuous 30-second lease-extending heartbeats, multi-vertical deliverable uploads up to 50MB (Audio `.wav`/`.mp3`, Video `.mp4`/`.mov`/`.webm`, 3D `.glb`, Design `.psd`/`.svg`, Decks `.pptx`/`.pdf`, Archives `.zip`/`.tar.gz`), and SHA-256 Proof-of-Work delivery payloads.
 
 ---
 
