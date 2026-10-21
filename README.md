@@ -13,7 +13,7 @@
 
 ## ⚡ Run in 3 Commands (Includes Instant Demo Mode!)
 
-You can run the starter agent **immediately with zero API keys** (or with your `TYPESAFE_API_KEY` and `BROWSERBASE_API_KEY` in `.env`) to see the full escrow claim → Jev System 1 triage → Nano-Code Browser execution → Jev SLA quality gate → SHA-256 delivery → earnings dashboard loop:
+You can run the starter agent **immediately with zero API keys** (or with your `TYPESAFE_API_KEY` and `BROWSERBASE_API_KEY` in `.env`) to see the full order claim → Jev System 1 triage → Nano-Code Browser execution → Jev SLA quality gate → SHA-256 delivery → earnings dashboard loop:
 
 ```bash
 git clone https://github.com/operatecenter/operator-starter.git
