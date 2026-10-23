@@ -27,6 +27,9 @@ import {
   type BrowserRuntimeType,
 } from "./browser.js";
 import { NANO_OPERATORS, resolveNanoOperator, toOperatorManifest } from "./nanos.js";
+import { runInteractiveSetupWizard } from "./setup.js";
+import { LeadOperatorConsole } from "./console.js";
+import { SkillsManager } from "./skills.js";
 
 // Auto-load local .env if present (zero external dependencies)
 function loadDotEnv() {
@@ -79,6 +82,8 @@ const SELECTED_NANO_ID =
 
 const runtimeFlagIdx = process.argv.indexOf("--runtime");
 const CLI_RUNTIME = runtimeFlagIdx > 0 ? (process.argv[runtimeFlagIdx + 1] as BrowserRuntimeType) : undefined;
+const IS_CONSOLE = process.argv.includes("--console") || process.argv.includes("-i");
+const IS_DAEMON = process.argv.includes("--daemon");
 
 const FORCE_DEMO =
   !IS_ENROLL &&
@@ -86,7 +91,8 @@ const FORCE_DEMO =
   !IS_CREATE_GIGS &&
   !IS_BENCHMARKS &&
   !IS_LIST_NANOS &&
-  (process.argv.includes("--demo") || !API_KEY || API_KEY === "agt_your_agent_key_here");
+  !IS_CONSOLE &&
+  (process.argv.includes("--demo") || (!IS_DAEMON && (!API_KEY || API_KEY === "agt_your_agent_key_here")));
 
 const jevEngine = new JevDecisionEngine();
 const browserEngine = new TieredBrowserEngine({ runtime: CLI_RUNTIME });
@@ -632,7 +638,7 @@ async function main() {
   } else if (IS_LIST_NANOS) {
     printNanoCatalog();
   } else if (IS_SETUP) {
-    await runSetupWizard();
+    await runInteractiveSetupWizard();
   } else if (IS_CREATE_GIGS) {
     if (!API_KEY || API_KEY === "agt_your_agent_key_here") {
       console.error("❌ OPERATE_API_KEY is required to publish gigs. Run `npm run setup` or `npm run enroll` first.");
@@ -643,8 +649,20 @@ async function main() {
     await runEnrollmentFlow();
   } else if (FORCE_DEMO) {
     await runDemoLoop();
-  } else {
+  } else if (IS_DAEMON) {
     await runLiveLoop();
+  } else {
+    // Default interactive mode: Lead Operator Console with Hermes Slash Command Parity
+    const leadConsole = new LeadOperatorConsole({
+      browserEngine,
+      jevEngine,
+      apiKey: API_KEY,
+      apiUrl: API_URL,
+      sellerEmail: process.env.SELLER_EMAIL,
+      leadOperatorName: process.env.LEAD_OPERATOR_NAME,
+      activeModel: process.env.ACTIVE_MODEL,
+    });
+    await leadConsole.startInteractiveSession();
   }
 }
 

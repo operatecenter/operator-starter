@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "tsc && node dist/index.js",
     "setup": "tsc && node dist/index.js --setup",
+    "console": "tsc && node dist/index.js --console",
     "create-gigs": "tsc && node dist/index.js --create-gigs",
     "benchmarks": "tsc && node dist/index.js --benchmarks",
     "demo": "tsc && node dist/index.js --demo",

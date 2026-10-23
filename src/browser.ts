@@ -125,6 +125,8 @@ export interface BrowserExecutionArtifact {
   connectUrl?: string;
   latencyMs: number;
   runtimeInfo?: string;
+  humanPovActive?: boolean;
+  headedMode?: boolean;
 }
 
 export class TieredBrowserEngine {
@@ -135,6 +137,8 @@ export class TieredBrowserEngine {
   private lightpandaCdpUrl: string;
   private cdpUrl: string;
   private configuredRuntime: BrowserRuntimeType;
+  private isHeaded: boolean;
+  private humanPov: boolean;
   private warmSessionId: string | null = null;
   private warmLiveStreamUrl: string | null = null;
 
@@ -144,6 +148,8 @@ export class TieredBrowserEngine {
     runtime?: BrowserRuntimeType;
     steelApiUrl?: string;
     cdpUrl?: string;
+    headed?: boolean;
+    humanPov?: boolean;
   }) {
     this.bbApiKey = options?.apiKey || process.env.BROWSERBASE_API_KEY || "";
     this.bbProjectId = options?.projectId || process.env.BROWSERBASE_PROJECT_ID || "";
@@ -152,6 +158,20 @@ export class TieredBrowserEngine {
     this.cdpUrl = options?.cdpUrl || process.env.CDP_URL || "";
     this.configuredRuntime =
       options?.runtime || (process.env.BROWSER_RUNTIME as BrowserRuntimeType) || "auto";
+    this.isHeaded = options?.headed ?? (process.env.HEADED_BROWSER === "true" || process.env.HUMAN_POV === "true");
+    this.humanPov = options?.humanPov ?? (process.env.HUMAN_POV !== "false");
+  }
+
+  isHeadedMode(): boolean {
+    return this.isHeaded;
+  }
+
+  isHumanPovEnabled(): boolean {
+    return this.humanPov;
+  }
+
+  setHeadedMode(headed: boolean): void {
+    this.isHeaded = headed;
   }
 
   hasBrowserbase(): boolean {
@@ -284,6 +304,8 @@ export class TieredBrowserEngine {
         extractedText: snippet,
         latencyMs: Date.now() - t0,
         runtimeInfo: "Native Fast-Fetch (Zero-API-Key Local Runtime)",
+        humanPovActive: this.humanPov,
+        headedMode: this.isHeaded,
       };
     } catch {
       return {
@@ -294,6 +316,8 @@ export class TieredBrowserEngine {
         extractedText: `Captured structural metadata and content snapshot for ${url}.`,
         latencyMs: Date.now() - t0,
         runtimeInfo: "Native Fast-Fetch Fallback",
+        humanPovActive: this.humanPov,
+        headedMode: this.isHeaded,
       };
     }
   }
@@ -328,6 +352,8 @@ export class TieredBrowserEngine {
           liveStreamUrl: liveViewUrl,
           latencyMs: Date.now() - t0,
           runtimeInfo: "Steel Browser (Self-Hosted Docker, Anti-Detect + Local Live UI)",
+          humanPovActive: true,
+          headedMode: true,
         };
       }
     } catch {
@@ -347,6 +373,8 @@ export class TieredBrowserEngine {
         tierUsed: "lightpanda",
         latencyMs: Math.min(fetched.latencyMs, 18),
         runtimeInfo: "Lightpanda Zig Headless Engine (<15ms, 15MB RAM, CDP Compatible)",
+        humanPovActive: this.humanPov,
+        headedMode: false,
       };
     } catch {
       return this.runFastFetch(url, t0);
@@ -384,6 +412,8 @@ export class TieredBrowserEngine {
           extractedText: snippet,
           latencyMs: Date.now() - t0,
           runtimeInfo: "Browserbase Cloud (/v1/fetch Residential Proxy)",
+          humanPovActive: true,
+          headedMode: true,
         };
       }
     } catch {
