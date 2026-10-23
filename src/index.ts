@@ -1,23 +1,32 @@
 #!/usr/bin/env node
 /**
- * Operate.Center Autonomous Agent Starter Kit (v1.2.0)
+ * Operate.Center Autonomous Agent Starter Kit (v1.4.0)
  *
- * Implements Operate Agent Protocol v1.0 + Dual-Brain Architecture:
- * 1. Discovery (`/.well-known/operate-agent.json`) & Interactive Device Enrollment (`--enroll`)
- * 2. System 1 Decision Engine (TypeSafe Jev `jev-latest`):
- *    - Sub-20ms Pre-Lease Capability Triage (`noul`)
- *    - Cost-Aware Execution Tier Routing (`fast_fetch` vs `local_browser` vs `browserbase_stealth`)
- *    - Pre-Delivery SLA Quality Gate (`noul`)
- * 3. Tiered Browser & Web Engine (`Browserbase /v1/fetch`, Local Stagehand/Playwright, or Browserbase Cloud w/ Live View broadcast)
+ * Implements Operate Agent Protocol v1.0 + Self-Sufficient Multi-Runtime Architecture:
+ * 1. Pluggable Browser & Sandbox Runtimes (Zero Vendor Lock-In):
+ *    - Tier 0: Native Fast-Fetch (<10ms, $0, Zero API Keys)
+ *    - Tier 1: Local Playwright / Headless Chromium ($0 local compute)
+ *    - Tier 2: Self-Hosted Steel Browser (Docker, Anti-Detect + Local Live View UI)
+ *    - Tier 3: Lightpanda Zig Headless Engine (<15ms, 15MB RAM, 10x lighter)
+ *    - Tier 4: MicroVM Sandboxes (Firecracker / Docker) for untrusted code execution
+ *    - Tier 5: Optional Cloud Escalation (Browserbase Cloud)
+ * 2. System 1 Decision Engine (TypeSafe Jev `jev-latest` or Deterministic Heuristic Fallback)
+ * 3. Autonomous Freelancing: 1-Click setup automatically enrolls agent & publishes 5 live marketplace gigs
  * 4. Continuous 30s Lease-Extending Heartbeats & Cryptographic SHA-256 Proof-of-Work Certificates
  */
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import readline from "node:readline";
 import { JevDecisionEngine, type JevTriageResult } from "./jev.js";
-import { TieredBrowserEngine, type BrowserExecutionArtifact } from "./browser.js";
-import { NANO_OPERATORS, resolveNanoOperator } from "./nanos.js";
+import {
+  TieredBrowserEngine,
+  RUNTIME_BENCHMARKS,
+  type BrowserExecutionArtifact,
+  type BrowserRuntimeType,
+} from "./browser.js";
+import { NANO_OPERATORS, resolveNanoOperator, toOperatorManifest } from "./nanos.js";
 
 // Auto-load local .env if present (zero external dependencies)
 function loadDotEnv() {
@@ -55,52 +64,87 @@ export interface JobOrder {
 }
 
 const API_URL = (process.env.OPERATE_API_URL || "https://operate.center").replace(/\/+$/, "");
-const API_KEY = process.env.OPERATE_API_KEY || "";
+let API_KEY = process.env.OPERATE_API_KEY || "";
+
+// CLI Argument Flags
 const IS_ENROLL = process.argv.includes("--enroll");
+const IS_SETUP = process.argv.includes("--setup");
+const IS_CREATE_GIGS = process.argv.includes("--create-gigs");
+const IS_BENCHMARKS = process.argv.includes("--benchmarks");
 const IS_LIST_NANOS = process.argv.includes("--list-nanos");
+
 const nanoFlagIdx = process.argv.indexOf("--nano");
 const SELECTED_NANO_ID =
   nanoFlagIdx > 0 ? process.argv[nanoFlagIdx + 1] : process.env.OPERATE_NANO_OPERATOR || "";
+
+const runtimeFlagIdx = process.argv.indexOf("--runtime");
+const CLI_RUNTIME = runtimeFlagIdx > 0 ? (process.argv[runtimeFlagIdx + 1] as BrowserRuntimeType) : undefined;
+
 const FORCE_DEMO =
   !IS_ENROLL &&
+  !IS_SETUP &&
+  !IS_CREATE_GIGS &&
+  !IS_BENCHMARKS &&
   !IS_LIST_NANOS &&
   (process.argv.includes("--demo") || !API_KEY || API_KEY === "agt_your_agent_key_here");
 
 const jevEngine = new JevDecisionEngine();
-const browserEngine = new TieredBrowserEngine();
+const browserEngine = new TieredBrowserEngine({ runtime: CLI_RUNTIME });
 
 function sha256(payload: unknown): string {
   return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
-function banner(mode: "DEMO" | "LIVE" | "ENROLL") {
+function printBenchmarkTable() {
+  console.log("\n╔════════════════════════════════════════════════════════════════════════════════════════════════╗");
+  console.log("║ ⚡ BROWSER & COMPUTER-USE RUNTIME PERFORMANCE & COST BENCHMARKS (v1.4)                         ║");
+  console.log("╚════════════════════════════════════════════════════════════════════════════════════════════════╝");
+  console.log(
+    "| Runtime Engine           | Startup  | RAM Usage  | Cost/Hour      | API Key Required?       | Anti-Bot Stealth      |"
+  );
+  console.log(
+    "|:-------------------------|:---------|:-----------|:---------------|:------------------------|:----------------------|"
+  );
+  for (const b of RUNTIME_BENCHMARKS) {
+    const rName = b.name.padEnd(25).slice(0, 25);
+    const lat = b.startupLatencyMs.padEnd(8).slice(0, 8);
+    const ram = b.ramUsageMb.padEnd(10).slice(0, 10);
+    const cost = b.costPerHour.padEnd(14).slice(0, 14);
+    const keys = b.apiKeyRequired.padEnd(23).slice(0, 23);
+    const stealth = b.antiBotStealth.padEnd(21).slice(0, 21);
+    console.log(`| ${rName} | ${lat} | ${ram} | ${cost} | ${keys} | ${stealth} |`);
+  }
+  console.log("└────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
+}
+
+async function banner(mode: "DEMO" | "LIVE" | "ENROLL" | "SETUP") {
+  const activeRuntime = await browserEngine.resolveActiveRuntime();
+
   console.log("╔══════════════════════════════════════════════════════════════════════╗");
-  console.log("║   ⚡ OPERATE.CENTER — AUTONOMOUS EARNING AGENT STARTER v1.3.0        ║");
+  console.log("║   ⚡ OPERATE.CENTER — SELF-SUFFICIENT AUTONOMOUS AGENT v1.4.0        ║");
   console.log("╚══════════════════════════════════════════════════════════════════════╝");
   console.log(
     `  Mode         : ${
       mode === "DEMO"
-        ? "🧪 DEMO MODE (Simulated Escrow Queue + Live Jev/Browserbase/Nano-Code)"
-        : mode === "ENROLL"
-          ? "🔑 DEVICE ENROLLMENT (Operate Agent Protocol v1.0)"
-          : "🟢 LIVE PRODUCTION (Operate Agent Protocol v1.0)"
+        ? "🧪 DEMO MODE (Simulated Escrow Queue + Zero-API-Key Execution)"
+        : mode === "SETUP"
+          ? "🛠️  INITIAL SETUP & AUTONOMOUS GIG ENLISTMENT WIZARD"
+          : mode === "ENROLL"
+            ? "🔑 DEVICE ENROLLMENT (Operate Agent Protocol v1.0)"
+            : "🟢 LIVE PRODUCTION EARNING (Operate Agent Protocol v1.0)"
     }`
   );
   console.log(`  Marketplace  : ${API_URL}`);
   console.log(
     `  System 1 Jev : ${
-      jevEngine.isLive() ? "🟢 TypeSafe Jev Active (jev-latest)" : "⚪ Heuristic Fallback (Set TYPESAFE_API_KEY for Jev)"
+      jevEngine.isLive()
+        ? "🟢 TypeSafe Jev Active (jev-latest)"
+        : "⚪ Local Heuristic Engine (100% Free, Zero Keys Needed)"
     }`
   );
+  console.log(`  Browser Pool : 🟢 ${activeRuntime.toUpperCase()} (Self-Sufficient Multi-Runtime)`);
   console.log(
-    `  Browser Pool : ${
-      browserEngine.hasBrowserbase()
-        ? "🟢 Browserbase Cloud (CAPTCHA Auto-Solve + /v1/fetch + Live Stream)"
-        : "⚪ Local HTTP / Stagehand Mode (Set BROWSERBASE_API_KEY for Cloud)"
-    }`
-  );
-  console.log(
-    `  Nano-Code    : 🧩 ${Object.keys(NANO_OPERATORS).length} Specialized Nano-Operators Built-In (${
+    `  Nano-Code    : 🧩 ${Object.keys(NANO_OPERATORS).length} Specialized Nano-Operators (${
       SELECTED_NANO_ID || "Auto-Match"
     })`
   );
@@ -112,8 +156,7 @@ async function sleep(ms: number) {
 }
 
 /**
- * Execute the gig using the Jev-routed tier (`fast_fetch`, `local_browser`, or `browserbase_stealth`)
- * and Specialized Nano-Code synthesis.
+ * Execute the gig using the self-sufficient runtime and Specialized Nano-Code synthesis.
  */
 async function executeGigTask(
   job: JobOrder,
@@ -129,41 +172,39 @@ async function executeGigTask(
   const targetUrl =
     input.target_url ||
     input.target_domain ||
+    input.company_url ||
     input.url ||
     (input.repo ? `https://github.com/${input.repo}` : "https://operate.center");
 
   let browserArtifact: BrowserExecutionArtifact;
 
-  if (
-    (triage.recommendedTier === "browserbase_stealth" || nanoSpec?.defaultTier === "browserbase_stealth") &&
-    browserEngine.hasBrowserbase()
-  ) {
-    const session = await browserEngine.acquireBrowserbaseSession(
-      {
-        job_id: job.id,
-        operator_id: job.operator_id,
-        nano_operator: nanoSpec?.id || "generic",
-      },
-      input.browserbase_context_id
-    );
+  // If gig requires interactive human-POV live streaming, acquire stateful session
+  if (nanoSpec?.humanPovMode || input.live_stream) {
+    const session = await browserEngine.acquireSession({
+      job_id: job.id,
+      operator_id: job.operator_id,
+      nano_operator: nanoSpec?.id || "generic",
+    });
+
     if (session) {
       if (session.liveStreamUrl && onStreamUrl) {
         await onStreamUrl(session.sessionId, session.liveStreamUrl);
       }
       const fetched = await browserEngine.runFastFetch(targetUrl);
-      await browserEngine.releaseBrowserbaseSession(session.sessionId);
+      await browserEngine.releaseSession(session.sessionId);
       browserArtifact = {
         ...fetched,
-        tierUsed: "browserbase_stealth",
+        tierUsed: session.runtime,
         sessionId: session.sessionId,
         liveStreamUrl: session.liveStreamUrl,
         latencyMs: Date.now() - t0,
       };
     } else {
-      browserArtifact = await browserEngine.runFastFetch(targetUrl);
+      browserArtifact = await browserEngine.execute(targetUrl);
     }
   } else {
-    browserArtifact = await browserEngine.runFastFetch(targetUrl);
+    // Normal self-sufficient execution
+    browserArtifact = await browserEngine.execute(targetUrl);
   }
 
   const nanoOutput = nanoSpec ? nanoSpec.synthesizeDeliverable(input, browserArtifact) : null;
@@ -174,7 +215,7 @@ async function executeGigTask(
     operator_id: job.operator_id,
     nano_specialist: nanoSpec ? { id: nanoSpec.id, name: nanoSpec.name, human_pov: !!nanoSpec.humanPovMode } : null,
     task_summary: `Fulfilled "${job.operator_name || job.operator_id}" for order #${job.id.slice(0, 12)} via ${
-      nanoSpec ? nanoSpec.id : browserArtifact.tierUsed
+      browserArtifact.runtimeInfo || browserArtifact.tierUsed
     }`,
     input_echo: input,
     findings: {
@@ -191,6 +232,7 @@ async function executeGigTask(
         url: browserArtifact.targetUrl,
         session_id: browserArtifact.sessionId || null,
         live_stream_url: browserArtifact.liveStreamUrl || null,
+        runtime: browserArtifact.runtimeInfo,
       },
     ],
     metrics: {
@@ -207,9 +249,52 @@ async function executeGigTask(
 }
 
 /**
+ * Automatically enlist and publish all built-in Nano-Operator freelance gigs on Operate.Center.
+ */
+async function publishFreelanceGigs(token: string): Promise<Array<{ id: string; url: string; name: string }>> {
+  console.log("\n🚀 [GIG ENLISTMENT] Publishing Autonomous Freelance Gigs to Operate.Center Marketplace...");
+  const publishedGigs: Array<{ id: string; url: string; name: string }> = [];
+
+  for (const [id, spec] of Object.entries(NANO_OPERATORS)) {
+    try {
+      const manifest = toOperatorManifest(spec);
+      const res = await fetch(`${API_URL}/api/agent/gig`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ operator_manifest: manifest }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const gigUrl = data.gig_url || `${API_URL}/marketplace/${data.gig_id}`;
+        console.log(`  ✅ Published "${spec.name}" ($${spec.priceUsd.toFixed(2)} USD)`);
+        console.log(`     👉 ${gigUrl}`);
+        publishedGigs.push({ id: data.gig_id, url: gigUrl, name: spec.name });
+      } else {
+        const err = (await res.json().catch(() => ({}))) as any;
+        console.warn(`  ⚠️  Could not publish "${spec.name}": ${err.error || res.statusText}`);
+      }
+    } catch (err: any) {
+      console.warn(`  ⚠️  Network error publishing "${spec.name}":`, err.message);
+    }
+  }
+
+  if (publishedGigs.length > 0) {
+    console.log(`\n🎉 Successfully published ${publishedGigs.length} freelance gig(s)!`);
+    console.log("   Buyers across Operate.Center can now hire your operator directly.");
+    console.log("   Your agent will automatically poll, claim leases, and collect 80% escrow payouts!\n");
+  }
+
+  return publishedGigs;
+}
+
+/**
  * Interactive Device Enrollment Flow (`OPERATE_AGENT_PROTOCOL_V1.md` Section 1)
  */
-async function runEnrollmentFlow() {
+async function runEnrollmentFlow(): Promise<string | null> {
   banner("ENROLL");
   const codeIdx = process.argv.indexOf("--code");
   const enrollmentCode = codeIdx > 0 ? process.argv[codeIdx + 1] : process.env.OPERATE_ENROLL_CODE || "";
@@ -227,9 +312,17 @@ async function runEnrollmentFlow() {
     body: JSON.stringify({
       ...(enrollmentCode ? { enrollment_code: enrollmentCode } : {}),
       manifest: {
-        agent_name: "Operator Starter v1.2 (Jev + Browserbase)",
-        harness: { name: "operator-starter", version: "1.2.0" },
-        capabilities: ["web_research", "browser_automation", "jev_system_one"],
+        agent_name: "Self-Sufficient Autonomous Operator v1.4",
+        harness: { name: "operator-starter", version: "1.4.0" },
+        capabilities: [
+          "web_research",
+          "browser_automation",
+          "steel_browser_self_hosted",
+          "lightpanda_zig_engine",
+          "local_playwright",
+          "microvm_sandboxing",
+          "typesafe_jev_system_one",
+        ],
       },
     }),
   });
@@ -237,7 +330,7 @@ async function runEnrollmentFlow() {
   const data = (await res.json()) as any;
   if (!res.ok) {
     console.error(`❌ Enrollment request failed:`, data);
-    process.exit(1);
+    return null;
   }
 
   const code = data.enrollment_code || enrollmentCode;
@@ -254,17 +347,62 @@ async function runEnrollmentFlow() {
     if (pollData.status === "approved" && token) {
       console.log(`\n🎉 Agent Approved! Minted Scoped Token: ${token.slice(0, 12)}...`);
       const envPath = path.resolve(process.cwd(), ".env");
-      fs.appendFileSync(envPath, `\nOPERATE_API_KEY=${token}\n`);
-      console.log(`💾 Saved OPERATE_API_KEY to ${envPath}. Run \`npm start\` to begin earning!`);
-      return;
+      let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
+      if (envContent.includes("OPERATE_API_KEY=")) {
+        envContent = envContent.replace(/OPERATE_API_KEY=.*/, `OPERATE_API_KEY=${token}`);
+      } else {
+        envContent += `\nOPERATE_API_KEY=${token}\n`;
+      }
+      fs.writeFileSync(envPath, envContent, "utf8");
+      console.log(`💾 Saved OPERATE_API_KEY to ${envPath}.`);
+      API_KEY = token;
+      return token;
     }
   }
 
   console.log("⌛ Enrollment timed out waiting for browser approval.");
+  return null;
+}
+
+/**
+ * Interactive Initial Setup Wizard: Runtime Selection, Performance Alerts & Autonomous Gig Enlistment
+ */
+async function runSetupWizard() {
+  await banner("SETUP");
+  printBenchmarkTable();
+
+  const activeRuntime = await browserEngine.resolveActiveRuntime();
+  console.log(`🔍 Detected Active Browser Runtime: 🟢 [${activeRuntime.toUpperCase()}]`);
+
+  let token = API_KEY;
+  if (!token || token === "agt_your_agent_key_here") {
+    console.log("\n🔑 Step 1: Agent Authentication & Device Enrollment");
+    console.log("   To earn real payouts and enlist freelance gigs, we will enroll your agent on Operate.Center.");
+    token = (await runEnrollmentFlow()) || "";
+    if (!token) {
+      console.log("❌ Setup could not complete enrollment. You can re-run with `npm run setup` anytime.");
+      return;
+    }
+  } else {
+    console.log(`\n🔑 Step 1: Existing Credentials Found (${token.slice(0, 10)}...)`);
+  }
+
+  console.log("\n💼 Step 2: Autonomous Freelance Gig Enlistment");
+  console.log("   Your agent is about to create & publish 5 high-converting freelance gigs on the public marketplace:");
+  for (const s of Object.values(NANO_OPERATORS)) {
+    console.log(`   • ${s.name.padEnd(42)} — $${s.priceUsd.toFixed(2)} USD (${s.defaultTier})`);
+  }
+
+  const published = await publishFreelanceGigs(token);
+
+  console.log("🏁 Step 3: Entering Autonomous Earning Daemon");
+  console.log("   Starting the background polling loop now...");
+  await runLiveLoop();
 }
 
 async function runDemoLoop() {
-  banner("DEMO");
+  await banner("DEMO");
+  printBenchmarkTable();
 
   const simulatedJobs: JobOrder[] = [
     {
@@ -318,14 +456,14 @@ async function runDemoLoop() {
     claimedCount++;
     console.log(`🔒 [LEASE] Claimed exclusive 15-min execution lease for #${job.id}`);
 
-    // 2. Execute via Tiered Browser / Web Engine
+    // 2. Execute via Self-Sufficient Browser / Web Engine
     const { deliverable, browserArtifact } = await executeGigTask(job, triage);
     console.log(
-      `🌐 [EXECUTION] Tier=${browserArtifact.tierUsed} | URL=${browserArtifact.targetUrl} | Title="${browserArtifact.pageTitle}" (${browserArtifact.latencyMs}ms)`
+      `🌐 [EXECUTION] Tier=${browserArtifact.tierUsed} | Runtime="${browserArtifact.runtimeInfo}" | Title="${browserArtifact.pageTitle}" (${browserArtifact.latencyMs}ms)`
     );
 
     // 3. System 1 Jev Pre-Delivery Quality Gate
-    const quality = await jevEngine.verifyDeliverable(job, deliverable);
+    const quality = await jevEngine.verifyQualityGate(job, deliverable);
     console.log(
       `🛡️  [JEV QUALITY GATE] SLA Check in ${quality.latencyMs}ms: meets_sla=${quality.qualityProbability} (${
         quality.passesGate ? "PASSED" : "NEEDS_REVISION"
@@ -350,11 +488,11 @@ async function runDemoLoop() {
   console.log(`│  Gross Order Vol  : $${grossVolume.toFixed(2)} USD${" ".repeat(39)} │`);
   console.log(`│  Net Agent Payout : $${netEarned.toFixed(2)} USD (80% Share)${" ".repeat(26)} │`);
   console.log("└──────────────────────────────────────────────────────────────────────┘");
-  console.log("\n🚀 Ready to earn real payouts? Enroll with `npm run enroll` or get your API key at https://operate.center/creator");
+  console.log("\n🚀 Ready to earn real payouts? Run `npm run setup` to enroll and enlist your freelance gigs!");
 }
 
 async function runLiveLoop() {
-  banner("LIVE");
+  await banner("LIVE");
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${API_KEY}`,
@@ -365,6 +503,7 @@ async function runLiveLoop() {
   const startTime = Date.now();
 
   const sendHeartbeat = async () => {
+    const runtime = await browserEngine.resolveActiveRuntime();
     await fetch(`${API_URL}/api/agent/heartbeat`, {
       method: "POST",
       headers,
@@ -374,9 +513,9 @@ async function runLiveLoop() {
         active_jobs: Array.from(activeJobs),
         runtime_info: {
           harness: "operator-starter",
-          harness_version: "1.2.0",
+          harness_version: "1.4.0",
+          browser_runtime: runtime,
           jev_enabled: jevEngine.isLive(),
-          browserbase_enabled: browserEngine.hasBrowserbase(),
           uptime_seconds: Math.round((Date.now() - startTime) / 1000),
         },
         timestamp: new Date().toISOString(),
@@ -427,7 +566,7 @@ async function runLiveLoop() {
 
       try {
         const { deliverable } = await executeGigTask(job, triage, async (sessionId, liveStreamUrl) => {
-          console.log(`📺 Broadcasting live Browserbase stream URL for order ${jobId}...`);
+          console.log(`📺 Broadcasting live browser stream URL for order ${jobId}...`);
           await fetch(`${API_URL}/api/order/${encodeURIComponent(jobId)}/stream`, {
             method: "POST",
             headers,
@@ -438,7 +577,7 @@ async function runLiveLoop() {
           }).catch(() => null);
         });
 
-        const quality = await jevEngine.verifyDeliverable(job, deliverable);
+        const quality = await jevEngine.verifyQualityGate(job, deliverable);
         console.log(`🛡️  [JEV QUALITY GATE] meets_sla=${quality.qualityProbability} (${quality.latencyMs}ms)`);
 
         const proofHash = sha256(deliverable);
@@ -474,20 +613,32 @@ async function runLiveLoop() {
 
 function printNanoCatalog() {
   console.log("╔══════════════════════════════════════════════════════════════════════╗");
-  console.log("║   🧩 OPERATE.CENTER — SPECIALIZED NANO-CODE OPERATORS (v1.3.0)       ║");
+  console.log("║   🧩 OPERATE.CENTER — SPECIALIZED NANO-CODE OPERATORS (v1.4.0)       ║");
   console.log("╚══════════════════════════════════════════════════════════════════════╝\n");
   for (const spec of Object.values(NANO_OPERATORS)) {
     console.log(`  • ${spec.id.padEnd(24)} (${spec.name})`);
-    console.log(`    ├─ Tier       : ${spec.defaultTier}${spec.humanPovMode ? " + Human-POV Persistent Context" : ""}`);
+    console.log(`    ├─ Price      : $${spec.priceUsd.toFixed(2)} USD (SLA: ${spec.deliverySlaMinutes} min)`);
+    console.log(`    ├─ Tier       : ${spec.defaultTier}${spec.humanPovMode ? " + Human-POV Live Stream" : ""}`);
     console.log(`    ├─ Skills     : ${spec.capabilities.join(", ")}`);
     console.log(`    └─ Specialty  : ${spec.tagline}\n`);
   }
+  console.log("  Run setup to enlist all gigs: `npm run setup`");
   console.log("  Run any Nano-Operator directly: `npm run demo -- --nano nano-vision-pov`\n");
 }
 
 async function main() {
-  if (IS_LIST_NANOS) {
+  if (IS_BENCHMARKS) {
+    printBenchmarkTable();
+  } else if (IS_LIST_NANOS) {
     printNanoCatalog();
+  } else if (IS_SETUP) {
+    await runSetupWizard();
+  } else if (IS_CREATE_GIGS) {
+    if (!API_KEY || API_KEY === "agt_your_agent_key_here") {
+      console.error("❌ OPERATE_API_KEY is required to publish gigs. Run `npm run setup` or `npm run enroll` first.");
+      process.exit(1);
+    }
+    await publishFreelanceGigs(API_KEY);
   } else if (IS_ENROLL) {
     await runEnrollmentFlow();
   } else if (FORCE_DEMO) {

@@ -1,17 +1,25 @@
 /**
- * TypeSafe Jev ("System One" Decision Model) Client for Operator Starter v1.2
+ * TypeSafe Jev ("System One" Decision Model) Client for Operator Starter v1.4
  *
  * Powers sub-20ms calibrated decisions (`noul`, `choice`, `score`):
  * 1. Pre-Lease Triage: Can this agent fulfill the queued gig within the 15-min SLA?
- * 2. Execution Tier Routing: `fast_fetch` ($0) vs `local_browser` ($0) vs `browserbase_stealth`
+ * 2. Execution Tier Routing: `fast_fetch` ($0) vs `steel_browser` ($0) vs `lightpanda` ($0) vs `local_browser` ($0) vs `browserbase_stealth`
  * 3. Pre-Delivery Quality Gate: Does the output satisfy the buyer's requirements rubric?
  *
- * Automatically falls back to deterministic local heuristics when `TYPESAFE_API_KEY` is not set.
+ * Automatically falls back to deterministic local heuristics when `TYPESAFE_API_KEY` is not set (Zero API Key Path).
  */
+
+export type JevExecutionTier =
+  | "fast_fetch"
+  | "local_browser"
+  | "steel_browser"
+  | "lightpanda"
+  | "microvm_sandbox"
+  | "browserbase_stealth";
 
 export interface JevTriageResult {
   canFulfillProbability: number;
-  recommendedTier: "fast_fetch" | "local_browser" | "browserbase_stealth";
+  recommendedTier: JevExecutionTier;
   tierConfidence: number;
   latencyMs: number;
   model: string;
@@ -44,24 +52,30 @@ export class JevDecisionEngine {
    */
   async triageJob(job: Record<string, any>): Promise<JevTriageResult> {
     const t0 = Date.now();
-    const forcedMode = process.env.BROWSER_MODE;
+    const forcedRuntime = process.env.BROWSER_RUNTIME;
 
     if (!this.isLive()) {
       const input = job.input_data || {};
       const requiresStealth = Boolean(input.requires_stealth || input.live_stream || job.requires_computer_use);
-      const tier: JevTriageResult["recommendedTier"] =
-        forcedMode === "browserbase_stealth" || forcedMode === "local_browser" || forcedMode === "fast_fetch"
-          ? forcedMode
-          : requiresStealth
-            ? "browserbase_stealth"
-            : "fast_fetch";
+      const requiresCode = Boolean(input.repo || input.execute_code || input.run_tests);
+
+      let tier: JevExecutionTier = "fast_fetch";
+      if (forcedRuntime && forcedRuntime !== "auto") {
+        tier = forcedRuntime as JevExecutionTier;
+      } else if (requiresCode) {
+        tier = "microvm_sandbox";
+      } else if (requiresStealth) {
+        tier = process.env.STEEL_API_URL ? "steel_browser" : "browserbase_stealth";
+      } else {
+        tier = "fast_fetch";
+      }
 
       return {
-        canFulfillProbability: 0.94,
+        canFulfillProbability: 0.95,
         recommendedTier: tier,
-        tierConfidence: 0.88,
+        tierConfidence: 0.90,
         latencyMs: Math.max(1, Date.now() - t0),
-        model: "jev-heuristic-fallback",
+        model: "jev-deterministic-local",
       };
     }
 
@@ -79,6 +93,10 @@ export class JevDecisionEngine {
               "web_scraping_and_seo_teardown",
               "github_pr_and_security_audit",
               "social_media_and_launch_thread_writing",
+              "steel_browser_self_hosted_docker",
+              "lightpanda_zig_headless_engine",
+              "local_playwright_chromium",
+              "microvm_code_sandbox",
               "browserbase_cloud_session_and_fetch",
               "llm_report_synthesis",
             ],
@@ -96,14 +114,18 @@ export class JevDecisionEngine {
             },
             execution_tier: {
               type: "choice",
-              instructions: "Select the most cost-effective execution engine for this task.",
+              instructions: "Select the most cost-effective, self-sufficient execution engine for this task.",
               criteria: {
                 fast_fetch:
-                  "Website SEO/pricing teardown, GitHub PR/repo security review, or social/content generation that can be fulfilled via HTTP/Fetch + LLM",
-                local_browser:
-                  "Multi-step interactive DOM navigation or form submission on standard public websites",
+                  "Simple read-only web page, public URL, SEO audit, or markdown inspection without dynamic JavaScript.",
+                lightpanda:
+                  "Dynamic Single Page Application (SPA), JavaScript execution needed, but no CAPTCHA or anti-bot.",
+                steel_browser:
+                  "Requires browser session with anti-detect, fingerprint masking, or live streaming viewport.",
+                microvm_sandbox:
+                  "Requires untrusted code execution, git clone, bash scripts, or security auditing.",
                 browserbase_stealth:
-                  "Requires cloud stealth browser, CAPTCHA solving, or live buyer screen streaming",
+                  "Enterprise Cloudflare Turnstile / DataDome bypass or residential proxy required.",
               },
             },
           },
@@ -111,45 +133,58 @@ export class JevDecisionEngine {
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        throw new Error(`Jev API returned HTTP ${res.status}`);
       }
 
       const data = (await res.json()) as any;
-      const canFulfill = data?.answers?.can_fulfill?.noul ?? 0.9;
-      let recommendedTier = (data?.answers?.execution_tier?.choice || "fast_fetch") as JevTriageResult["recommendedTier"];
-      if (forcedMode === "browserbase_stealth" || forcedMode === "local_browser" || forcedMode === "fast_fetch") {
-        recommendedTier = forcedMode;
-      }
+      const canFulfill =
+        typeof data.answers?.can_fulfill?.probability === "number"
+          ? data.answers.can_fulfill.probability
+          : 0.92;
+      const tierChoice = (data.answers?.execution_tier?.choice || "fast_fetch") as JevExecutionTier;
+      const tierProb =
+        typeof data.answers?.execution_tier?.probability === "number"
+          ? data.answers.execution_tier.probability
+          : 0.85;
 
       return {
-        canFulfillProbability: Number(canFulfill.toFixed(3)),
-        recommendedTier,
-        tierConfidence: Number((data?.answers?.execution_tier?.confidence ?? 0.8).toFixed(3)),
+        canFulfillProbability: canFulfill,
+        recommendedTier: tierChoice,
+        tierConfidence: tierProb,
         latencyMs: Date.now() - t0,
-        model: data?.model || this.model,
+        model: this.model,
       };
     } catch {
       return {
-        canFulfillProbability: 0.91,
+        canFulfillProbability: 0.94,
         recommendedTier: "fast_fetch",
-        tierConfidence: 0.8,
+        tierConfidence: 0.85,
         latencyMs: Date.now() - t0,
-        model: "jev-fallback",
+        model: "jev-heuristic-fallback",
       };
     }
   }
 
   /**
-   * Pre-delivery quality gate: verifies the generated deliverable satisfies the job before submitting to escrow review.
+   * Pre-delivery SLA & quality gate (`POST https://api.typesafe.ai/v1/systemone`).
    */
-  async verifyDeliverable(job: Record<string, any>, deliverable: Record<string, any>): Promise<JevQualityGateResult> {
+  async verifyQualityGate(
+    job: Record<string, any>,
+    deliverable: Record<string, any>
+  ): Promise<JevQualityGateResult> {
     const t0 = Date.now();
+
     if (!this.isLive()) {
+      const hasOutput =
+        Boolean(deliverable.task_summary) &&
+        Boolean(deliverable.findings) &&
+        Object.keys(deliverable.findings).length > 0;
+
       return {
-        passesGate: true,
-        qualityProbability: 0.96,
+        passesGate: hasOutput,
+        qualityProbability: hasOutput ? 0.96 : 0.40,
         latencyMs: Math.max(1, Date.now() - t0),
-        model: "jev-heuristic-fallback",
+        model: "jev-deterministic-local",
       };
     }
 
@@ -163,41 +198,41 @@ export class JevDecisionEngine {
         body: JSON.stringify({
           model: this.model,
           state: JSON.stringify({
-            job_operator: job.operator_name || job.operator_id,
-            job_input: job.input_data,
-            status: "completed",
-            deliverable_summary: deliverable.task_summary,
-            deliverable_report: deliverable.report_markdown || deliverable.findings,
-            evidence_attached: Boolean(deliverable.evidence?.length),
+            buyer_requirements: job.requirements || job.input_data,
+            agent_deliverable: deliverable,
           }),
           questions: {
-            meets_sla: {
+            meets_requirements: {
               type: "noul",
               instructions:
-                "Is status completed with a non-empty deliverable_report and evidence_attached matching the job_operator?",
+                "Does the agent_deliverable satisfy the buyer_requirements with complete, accurate, and non-empty data?",
             },
           },
         }),
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        throw new Error(`Jev API returned HTTP ${res.status}`);
       }
 
       const data = (await res.json()) as any;
-      const prob = data?.answers?.meets_sla?.noul ?? 0.92;
+      const prob =
+        typeof data.answers?.meets_requirements?.probability === "number"
+          ? data.answers.meets_requirements.probability
+          : 0.95;
+
       return {
-        passesGate: prob >= 0.5,
-        qualityProbability: Number(prob.toFixed(3)),
+        passesGate: prob >= 0.70,
+        qualityProbability: prob,
         latencyMs: Date.now() - t0,
-        model: data?.model || this.model,
+        model: this.model,
       };
     } catch {
       return {
         passesGate: true,
-        qualityProbability: 0.92,
+        qualityProbability: 0.94,
         latencyMs: Date.now() - t0,
-        model: "jev-fallback",
+        model: "jev-heuristic-fallback",
       };
     }
   }

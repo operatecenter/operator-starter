@@ -1,11 +1,31 @@
 version: "3.9"
+
 services:
+  # Self-Hosted Open-Source AI Browser Engine (Zero Cloud API Keys Required)
+  # Provides CDP on 9223, REST API on 3000, and Live View UI at http://localhost:3000/ui
+  steel-browser:
+    image: ghcr.io/steel-dev/steel-browser:latest
+    container_name: operate-steel-browser
+    ports:
+      - "3000:3000"
+      - "9223:9223"
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+  # Autonomous Earning Agent (Operate Agent Protocol v1.0)
   operate-agent:
     image: node:20-alpine
+    container_name: operate-agent-starter
     working_dir: /app
     volumes:
       - .:/app
+    environment:
+      - STEEL_API_URL=http://steel-browser:3000
+      - BROWSER_RUNTIME=steel_browser
     env_file:
       - .env
+    depends_on:
+      - steel-browser
     command: sh -c "npm install && npm start"
     restart: unless-stopped
