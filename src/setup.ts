@@ -68,11 +68,12 @@ export async function runInteractiveSetupWizard(): Promise<void> {
   console.log("  3) 🎭 Anthropic / Claude 3.7 Sonnet (Hybrid Thinking) — [Top Tier Computer Use]");
   console.log("  4) 🎭 Anthropic / Claude 3.5 Sonnet — [Fast & Deterministic Code/Tool Use]");
   console.log("  5) 🌐 OpenAI / GPT-4o (Omni) — [High Multimodal Throughput]");
-  console.log("  6) ⚡ Google / Gemini 2.0 Flash — [1M+ Context, Sub-Second]");
-  console.log("  7) 🔬 DeepSeek / R1 — [Competitive Open Reasoning]");
-  console.log("  8) 🚀 TypeSafe Jev — [Sub-20ms System 1 Calibrated Decisions]");
+  console.log("  6) 💡 OpenAI / o3-mini — [Fast Mathematical & Reasoning Model, Low Cost]");
+  console.log("  7) ⚡ Google / Gemini 2.0 Flash — [1M+ Context, Sub-Second]");
+  console.log("  8) 🔬 DeepSeek / R1 — [Competitive Open Reasoning]");
+  console.log("  9) 🚀 TypeSafe Jev — [Sub-20ms System 1 Calibrated Decisions]");
 
-  const modelChoice = await askQuestion(rl, "Choose model option [1-8]", "1");
+  const modelChoice = await askQuestion(rl, "Choose model option [1-9]", "1");
   let selectedModel = "ollama/hermes-3-llama-3.1-8b";
 
   switch (modelChoice) {
@@ -92,14 +93,18 @@ export async function runInteractiveSetupWizard(): Promise<void> {
       envConfig.OPENAI_API_KEY = await askQuestion(rl, "Enter OPENAI_API_KEY", process.env.OPENAI_API_KEY || "");
       break;
     case "6":
+      selectedModel = "openai/o3-mini";
+      envConfig.OPENAI_API_KEY = await askQuestion(rl, "Enter OPENAI_API_KEY", process.env.OPENAI_API_KEY || "");
+      break;
+    case "7":
       selectedModel = "google/gemini-2.0-flash";
       envConfig.GOOGLE_API_KEY = await askQuestion(rl, "Enter GOOGLE_API_KEY", process.env.GOOGLE_API_KEY || "");
       break;
-    case "7":
+    case "8":
       selectedModel = "deepseek/deepseek-r1";
       envConfig.DEEPSEEK_API_KEY = await askQuestion(rl, "Enter DEEPSEEK_API_KEY", process.env.DEEPSEEK_API_KEY || "");
       break;
-    case "8":
+    case "9":
       selectedModel = "typesafe/jev-latest";
       envConfig.TYPESAFE_API_KEY = await askQuestion(rl, "Enter TYPESAFE_API_KEY", process.env.TYPESAFE_API_KEY || "");
       break;
@@ -119,11 +124,12 @@ export async function runInteractiveSetupWizard(): Promise<void> {
   console.log("  1) 👁️  Local Headed Chromium [Human-POV Non-Headless, Visible Screen, $0]");
   console.log("  2) 🐳 Steel Browser (Self-Hosted Docker w/ Built-in Live View UI, $0)");
   console.log("  3) ⚡ Lightpanda (Zig Headless Engine, <15ms, 15MB RAM, 10x Lighter, $0)");
-  console.log("  4) 🔒 MicroVM Sandbox (Firecracker / Rootless Docker for Untrusted Code, $0)");
-  console.log("  5) ☁️  Browserbase Cloud (Managed Fleet w/ Residential Proxies & Auto-CAPTCHA)");
-  console.log("  6) 📄 Native Fast-Fetch (<10ms, $0, Zero Keys, Markdown/HTML heuristics)");
+  console.log("  4) 🔒 MicroVM Sandbox (Perplexity SPACE / Firecracker for Untrusted Code, $0)");
+  console.log("  5) 🤖 Browser-Use (Python / CDP Agent Loop for Multi-Step Navigation, $0)");
+  console.log("  6) ☁️  Browserbase Cloud (Managed Fleet w/ Residential Proxies & Auto-CAPTCHA)");
+  console.log("  7) 📄 Native Fast-Fetch (<10ms, $0, Zero Keys, Markdown/HTML heuristics)");
 
-  const runtimeChoice = await askQuestion(rl, "Choose runtime option [1-6]", "1");
+  const runtimeChoice = await askQuestion(rl, "Choose runtime option [1-7]", "1");
   let selectedRuntime: BrowserRuntimeType = "local_playwright";
 
   switch (runtimeChoice) {
@@ -137,13 +143,17 @@ export async function runInteractiveSetupWizard(): Promise<void> {
       break;
     case "4":
       selectedRuntime = "microvm_sandbox";
+      envConfig.SPACE_API_URL = await askQuestion(rl, "Enter Perplexity SPACE API URL", process.env.SPACE_API_URL || "http://localhost:8080");
       break;
     case "5":
+      selectedRuntime = "browser_use";
+      break;
+    case "6":
       selectedRuntime = "browserbase_cloud";
       envConfig.BROWSERBASE_API_KEY = await askQuestion(rl, "Enter BROWSERBASE_API_KEY", process.env.BROWSERBASE_API_KEY || "");
       envConfig.BROWSERBASE_PROJECT_ID = await askQuestion(rl, "Enter BROWSERBASE_PROJECT_ID", process.env.BROWSERBASE_PROJECT_ID || "");
       break;
-    case "6":
+    case "7":
       selectedRuntime = "fast_fetch";
       break;
     default:
@@ -176,8 +186,27 @@ export async function runInteractiveSetupWizard(): Promise<void> {
     console.log("   plugins:\n     operate-center:\n       enabled: true\n       env:\n         OPERATE_API_KEY: <will_be_generated_next>");
     envConfig.LINKED_AGENT = "hermes";
   } else if (agentLinkChoice === "3" || agentLinkChoice === "4") {
+    const mcpConfig = {
+      mcpServers: {
+        operate: {
+          command: "npx",
+          args: ["-y", "operate-mcp@latest"],
+          env: { OPERATE_API_KEY: process.env.OPERATE_API_KEY || "agt_your_agent_key_here" },
+        },
+      },
+    };
+    if (agentLinkChoice === "3") {
+      try {
+        const cursorDir = path.resolve(process.cwd(), ".cursor");
+        if (!fs.existsSync(cursorDir)) fs.mkdirSync(cursorDir, { recursive: true });
+        fs.writeFileSync(path.join(cursorDir, "mcp.json"), JSON.stringify(mcpConfig, null, 2), "utf8");
+        console.log(`\n💾 Generated ready-to-use .cursor/mcp.json targeting operate-mcp.`);
+      } catch {
+        // Fallback
+      }
+    }
     console.log("\n💻 MCP Configuration snippet (ready for .cursor/mcp.json or claude_desktop_config.json):");
-    console.log(`   { "mcpServers": { "operate": { "command": "npx", "args": ["-y", "operate-mcp@latest"] } } }`);
+    console.log(`   ${JSON.stringify(mcpConfig, null, 2)}`);
     envConfig.LINKED_AGENT = agentLinkChoice === "3" ? "cursor" : "claudecode";
   } else if (agentLinkChoice === "5") {
     console.log("\n🐾 OpenClaw / Framework REST Bridge enabled.");

@@ -103,7 +103,7 @@ export const RECOMMENDED_SKILLS: Record<string, OperatorSkill> = {
   "microvm-sandbox": {
     id: "microvm-sandbox",
     name: "MicroVM Untrusted Code Sandbox",
-    description: "Spins up Firecracker or rootless Docker microVMs for untrusted script execution and repo isolation.",
+    description: "Spins up Firecracker microVMs via Perplexity SPACE (github.com/perplexityai/SPACE) for untrusted script execution and repo isolation.",
     version: "1.4.0",
     category: "coding",
     installed: false,
@@ -133,12 +133,20 @@ export class SkillsManager {
   }
 
   install(skillId: string): boolean {
-    const skill = this.skills.get(skillId.toLowerCase());
+    const clean = skillId.toLowerCase().trim();
+    const resolvedId = clean === "code-sandbox" ? "microvm-sandbox" : clean;
+    const skill = this.skills.get(resolvedId);
     if (skill) {
       skill.installed = true;
       return true;
     }
     return false;
+  }
+
+  get(skillId: string): OperatorSkill | undefined {
+    const clean = skillId.toLowerCase().trim();
+    const resolvedId = clean === "code-sandbox" ? "microvm-sandbox" : clean;
+    return this.skills.get(resolvedId);
   }
 
   search(keyword: string): OperatorSkill[] {
@@ -150,9 +158,5 @@ export class SkillsManager {
         s.description.toLowerCase().includes(q) ||
         s.slashCommand.toLowerCase().includes(q)
     );
-  }
-
-  get(skillId: string): OperatorSkill | undefined {
-    return this.skills.get(skillId.toLowerCase());
   }
 }

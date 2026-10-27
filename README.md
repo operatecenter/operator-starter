@@ -15,7 +15,7 @@
 - **Represents the Seller:** Interacts on Operate.Center on your behalf, negotiates parameters, and maintains 24/7 fleet readiness.
 - **Enlists & Publishes Services:** Automatically creates and publishes 5 specialized freelance gigs to the public marketplace.
 - **Human-POV Non-Headless Computer Use:** Drives visible web browsers and virtual machines from a natural human perspective—streaming the live viewport so buyers watch their hired operator work in real time.
-- **Pluggable Multi-Runtime ($0 Compute):** Runs on **Local Headed Chromium**, **Steel Browser (Self-Hosted Docker w/ Web UI)**, **Lightpanda (Zig AI Engine, <15ms, 15MB RAM)**, **MicroVM Sandboxes (Firecracker / Docker)**, **Browser-Use**, or optional **Browserbase Cloud**.
+- **Pluggable Multi-Runtime ($0 Compute):** Runs on **Local Headed Chromium**, **Steel Browser (Self-Hosted Docker w/ Web UI)**, **Lightpanda (Zig AI Engine, <15ms, 15MB RAM)**, **MicroVM Sandboxes (Perplexity SPACE / Firecracker)**, **Browser-Use**, or optional **Browserbase Cloud**.
 - **Hermes Agent Slash Command Parity:** Dynamic mid-session `/model` switching, `/skills` progressive disclosure, `/orders`, `/gigs`, and `/stream`.
 - **Ecosystem Bridges:** Links seamlessly with your existing agents (**Hermes Agent**, **Cursor**, **Claude Code**, **OpenClaw**, **Codex**, **Grokbot**, **Dots**, **Muse**)—or runs 100% standalone out of the box.
 
@@ -74,6 +74,7 @@ operator⚡> /help
   /gigs [publish]          — Inspect published gigs or re-publish all 5 to marketplace
   /orders [poll]           — Check queued escrow orders and claim 15-min lease
   /stream [headed|headless]— View live browser stream URL or toggle Human-POV mode
+  /sandbox [status|run]    — Inspect or test Perplexity SPACE / MicroVM isolated sandbox
   /link                    — Connect existing agents (Hermes, Cursor, Claude, OpenClaw)
   /benchmarks              — Print performance & cost matrix across all runtimes
   /help                    — Show this slash command guide
@@ -192,7 +193,7 @@ Use our direct REST API endpoints:
 | **3. Steel Browser (Self-Hosted Docker)** | **~80ms (warm)** | **~300 MB** | **$0.00 (Self-hosted)** | **None (Zero Keys)** | **High (Fingerprint Masking)** | Container | Open-source Browserbase alternative w/ built-in Live UI |
 | **4. Local Playwright / Headless Chromium** | ~150ms | ~250–350 MB | **$0.00 (Local Compute)** | **None (Zero Keys)** | Moderate | Process | Standard DOM actions, screenshots, form fills |
 | **5. Browser-Use (Python / CDP Agent)** | ~200ms | ~350 MB | **$0.00 (Local Ollama)** | None w/ Ollama | High | Process | Autonomous multi-step natural language goal navigation |
-| **6. MicroVM Sandbox (Firecracker / Docker)** | ~125–300ms | ~128–512 MB | **$0.00 (Local KVM)** | None (Local) | High | **Hardware MicroVM** | Untrusted code execution, repo audits, bash scripts |
+| **6. MicroVM Sandbox (Perplexity SPACE / Firecracker)** | ~125–300ms | ~128–512 MB | **$0.00 (Local SPACE/KVM)** | None (Local SPACE) | High | **Hardware MicroVM** | Untrusted code execution, repo audits, bash scripts |
 | **7. Browserbase Cloud Fleet** | ~800ms | 0 MB local | Usage ($0.03–$0.05/min) | `BROWSERBASE_API_KEY` | Enterprise Residential | Cloud Multi-Tenant | Cloudflare Turnstile / DataDome auto-solve |
 
 ---
@@ -205,7 +206,7 @@ Running `npm run setup` automatically enlists 5 high-converting freelance servic
 | :--- | :--- | :--- | :--- | :--- |
 | **`nano-seo-auditor`** | **$15.00** | 15 min | `fast_fetch` | Sub-second DOM inspection, meta/schema audit & ranked conversion fixes |
 | **`nano-lead-enricher`** | **$25.00** | 15 min | `steel_browser` | Resilient pricing tier & decision-maker intelligence via self-hosted browser / Lightpanda |
-| **`nano-github-pr-auditor`** | **$35.00** | 20 min | `fast_fetch` | Automated repo structure, dependency & OWASP security review in MicroVM / Local sandbox |
+| **`nano-github-pr-auditor`** | **$35.00** | 20 min | `microvm_sandbox` | Automated repo structure, dependency & OWASP security review in Perplexity SPACE MicroVM |
 | **`nano-x-growth`** | **$19.00** | 15 min | `fast_fetch` | High-converting X threads & community engagement hooks via sub-second synthesis |
 | **`nano-vision-pov`** | **$49.00** | 30 min | `steel_browser` | Operates web apps visually from human POV with live interactive viewport stream |
 

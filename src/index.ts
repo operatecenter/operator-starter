@@ -101,6 +101,13 @@ function sha256(payload: unknown): string {
   return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
+function mapJevTierToRuntime(tier?: string): BrowserRuntimeType | undefined {
+  if (!tier) return undefined;
+  if (tier === "local_browser") return "local_playwright";
+  if (tier === "browserbase_stealth") return "browserbase_cloud";
+  return tier as BrowserRuntimeType;
+}
+
 function printBenchmarkTable() {
   console.log("\n╔════════════════════════════════════════════════════════════════════════════════════════════════╗");
   console.log("║ ⚡ BROWSER & COMPUTER-USE RUNTIME PERFORMANCE & COST BENCHMARKS (v1.4)                         ║");
@@ -162,6 +169,101 @@ async function sleep(ms: number) {
 }
 
 /**
+ * Dynamic LLM synthesis router for the active model (Ollama, Anthropic, OpenAI, DeepSeek).
+ */
+async function synthesizeWithActiveModel(
+  modelId: string,
+  taskDescription: string,
+  contextData: string
+): Promise<string | null> {
+  const [provider, modelName] = modelId.includes("/") ? modelId.split("/") : ["ollama", modelId];
+  const prompt = `You are the Lead Operator delivering on Operate.Center. Task: ${taskDescription}\nContext: ${contextData.slice(0, 1000)}\nProvide 3 crisp executive findings.`;
+
+  try {
+    // 1. Ollama Free Local Weights
+    if (provider === "ollama") {
+      const host = (process.env.OLLAMA_HOST || "http://localhost:11434").replace(/\/+$/, "");
+      const res = await fetch(`${host}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelName || "hermes-3-llama-3.1-8b", prompt, stream: false }),
+        signal: AbortSignal.timeout(1500),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        return data.response?.trim() || null;
+      }
+    }
+
+    // 2. Anthropic Claude (3.7 Sonnet / 3.5 Sonnet)
+    if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelName || "claude-3-7-sonnet-20250219",
+          max_tokens: 300,
+          messages: [{ role: "user", content: prompt }],
+        }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        return data.content?.[0]?.text?.trim() || null;
+      }
+    }
+
+    // 3. OpenAI (GPT-4o / o3-mini)
+    if (provider === "openai" && process.env.OPENAI_API_KEY) {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelName || "gpt-4o",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 300,
+        }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        return data.choices?.[0]?.message?.content?.trim() || null;
+      }
+    }
+
+    // 4. DeepSeek
+    if (provider === "deepseek" && process.env.DEEPSEEK_API_KEY) {
+      const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelName || "deepseek-chat",
+          messages: [{ role: "user", content: prompt }],
+        }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        return data.choices?.[0]?.message?.content?.trim() || null;
+      }
+    }
+  } catch {
+    // Graceful fallback to deterministic nano synthesis
+  }
+  return null;
+}
+
+/**
  * Execute the gig using the self-sufficient runtime and Specialized Nano-Code synthesis.
  */
 async function executeGigTask(
@@ -206,12 +308,43 @@ async function executeGigTask(
         latencyMs: Date.now() - t0,
       };
     } else {
-      browserArtifact = await browserEngine.execute(targetUrl);
+      const tierToUse =
+        CLI_RUNTIME && CLI_RUNTIME !== "auto"
+          ? CLI_RUNTIME
+          : triage.recommendedTier !== "fast_fetch"
+            ? mapJevTierToRuntime(triage.recommendedTier)
+            : nanoSpec?.defaultTier;
+      browserArtifact = await browserEngine.execute(targetUrl, {
+        forceTier: tierToUse,
+        repo: input.repo,
+        executionCommand: input.command,
+        prNumber: input.pr_number,
+        instructions: input.instructions,
+      });
     }
   } else {
     // Normal self-sufficient execution
-    browserArtifact = await browserEngine.execute(targetUrl);
+    const tierToUse =
+      CLI_RUNTIME && CLI_RUNTIME !== "auto"
+        ? CLI_RUNTIME
+        : triage.recommendedTier !== "fast_fetch"
+          ? mapJevTierToRuntime(triage.recommendedTier)
+          : nanoSpec?.defaultTier;
+    browserArtifact = await browserEngine.execute(targetUrl, {
+      forceTier: tierToUse,
+      repo: input.repo,
+      executionCommand: input.command,
+      prNumber: input.pr_number,
+      instructions: input.instructions,
+    });
   }
+
+  const activeModel = process.env.ACTIVE_MODEL || "ollama/hermes-3-llama-3.1-8b";
+  const dynamicModelOutput = await synthesizeWithActiveModel(
+    activeModel,
+    job.operator_name || job.operator_id,
+    browserArtifact.extractedText || browserArtifact.pageTitle || ""
+  );
 
   const nanoOutput = nanoSpec ? nanoSpec.synthesizeDeliverable(input, browserArtifact) : null;
 
@@ -229,6 +362,8 @@ async function executeGigTask(
       page_title: browserArtifact.pageTitle,
       http_status: browserArtifact.statusCode,
       extracted_preview: browserArtifact.extractedText?.slice(0, 320),
+      active_model: activeModel,
+      ...(dynamicModelOutput ? { dynamic_reasoning: dynamicModelOutput } : {}),
       ...(nanoOutput ? { specialized_analysis: nanoOutput } : {}),
     },
     evidence: [
@@ -242,6 +377,7 @@ async function executeGigTask(
       },
     ],
     metrics: {
+      active_model: activeModel,
       jev_model: triage.model,
       jev_triage_ms: triage.latencyMs,
       jev_can_fulfill_prob: triage.canFulfillProbability,
