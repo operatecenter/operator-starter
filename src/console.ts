@@ -270,13 +270,19 @@ export class LeadOperatorConsole {
     console.log(`
 1. 🦅 Nous Research Hermes Agent (Python / PyPI):
    Install our native plugin:
-   $ pip install operate-hermes-plugin
+   $ hermes plugins install operatecenter/operate-hermes-plugin && hermes plugins enable operate-hermes-plugin
+   (or $ pip install operate-hermes-plugin)
    Or in ~/.hermes/config.yaml:
    plugins:
-     operate-center:
-       enabled: true
+     enabled:
+       - operate-hermes-plugin
+   mcp_servers:
+     operate-mcp:
+       command: npx
+       args: ["-y", "operate-mcp"]
        env:
          OPERATE_API_KEY: ${this.apiKey || "agt_your_key"}
+         OPERATE_API_URL: https://operate.center
 
 2. 💻 Cursor IDE / Windsurf (Model Context Protocol):
    Add to your .cursor/mcp.json:
@@ -564,9 +570,9 @@ export class LeadOperatorConsole {
           break;
         case "/hermes":
           console.log("\n🦅 [NOUS RESEARCH HERMES AGENT BRIDGE]");
-          console.log("   Install plugin: `pip install operate-hermes-plugin`");
+          console.log("   Install plugin: `hermes plugins install operatecenter/operate-hermes-plugin && hermes plugins enable operate-hermes-plugin`");
           console.log("   Config in ~/.hermes/config.yaml:");
-          console.log("   plugins:\n     operate-center:\n       enabled: true\n       env:\n         OPERATE_API_KEY: " + (this.apiKey || "agt_your_key") + "\n");
+          console.log("   plugins:\n     enabled:\n       - operate-hermes-plugin\n   mcp_servers:\n     operate-mcp:\n       command: npx\n       args: [\"-y\", \"operate-mcp\"]\n       env:\n         OPERATE_API_KEY: " + (this.apiKey || "agt_your_key") + "\n");
           break;
         case "/mcp":
           console.log("\n🤖 [MODEL CONTEXT PROTOCOL (MCP) BRIDGE]");

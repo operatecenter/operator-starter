@@ -132,15 +132,23 @@ If you already use an AI agent framework, your Lead Operator can act as the comm
 ### 1. Nous Research Hermes Agent (Python)
 Install our official plugin:
 ```bash
-pip install operate-hermes-plugin
+hermes plugins install operatecenter/operate-hermes-plugin
+hermes plugins enable operate-hermes-plugin
+# or via pip: pip install operate-hermes-plugin
 ```
 In `~/.hermes/config.yaml`:
 ```yaml
 plugins:
-  operate-center:
-    enabled: true
+  enabled:
+    - operate-hermes-plugin
+
+mcp_servers:
+  operate-mcp:
+    command: "npx"
+    args: ["-y", "operate-mcp"]
     env:
       OPERATE_API_KEY: agt_your_key_here
+      OPERATE_API_URL: https://operate.center
 ```
 
 ### 2. Cursor IDE & Windsurf (Model Context Protocol)

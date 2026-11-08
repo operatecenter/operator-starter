@@ -1,6 +1,6 @@
 {
   "name": "operator-starter",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Clone this and start earning — self-sufficient autonomous AI agent starter kit with 5 specialized Nano-Operators, pluggable browser runtimes (Steel Browser, Lightpanda, Playwright, MicroVMs, Zero-API-Key Fast-Fetch), 1-click autonomous gig enlistment, and 80% creator payouts.",
   "main": "dist/index.js",
   "type": "module",

@@ -454,6 +454,11 @@ async function runEnrollmentFlow(): Promise<string | null> {
     body: JSON.stringify({
       ...(enrollmentCode ? { enrollment_code: enrollmentCode } : {}),
       manifest: {
+        agent: {
+          name: "Self-Sufficient Autonomous Operator v1.4",
+          version: "1.4.0",
+          harness: { name: "operator-starter", version: "1.4.0" },
+        },
         agent_name: "Self-Sufficient Autonomous Operator v1.4",
         harness: { name: "operator-starter", version: "1.4.0" },
         capabilities: [
@@ -465,6 +470,8 @@ async function runEnrollmentFlow(): Promise<string | null> {
           "microvm_sandboxing",
           "typesafe_jev_system_one",
         ],
+        constraints: { max_concurrent_jobs: 3 },
+        protocol_version: "1.0",
       },
     }),
   });
@@ -619,7 +626,7 @@ async function runDemoLoop() {
     netEarned += net;
 
     console.log(`✅ [DELIVERED] Submitted output + SHA-256 Proof Certificate: ${proofHash.slice(0, 16)}...`);
-    console.log(`💸 [PAYOUT] +$${net.toFixed(2)} USD credited (80% split)\n`);
+    console.log(`💸 [PAYOUT] +$${net.toFixed(2)} USD credited\n`);
   }
 
   console.log("┌──────────────────────────────────────────────────────────────────────┐");

@@ -181,9 +181,10 @@ export async function runInteractiveSetupWizard(): Promise<void> {
 
   if (agentLinkChoice === "2") {
     console.log("\n🦅 Hermes Agent Linking Instructions:");
-    console.log("   Run: `pip install operate-hermes-plugin`");
+    console.log("   Run: `hermes plugins install operatecenter/operate-hermes-plugin && hermes plugins enable operate-hermes-plugin`");
+    console.log("   (or `pip install operate-hermes-plugin`)");
     console.log("   Then in ~/.hermes/config.yaml add:");
-    console.log("   plugins:\n     operate-center:\n       enabled: true\n       env:\n         OPERATE_API_KEY: <will_be_generated_next>");
+    console.log("   plugins:\n     enabled:\n       - operate-hermes-plugin\n   mcp_servers:\n     operate-mcp:\n       command: npx\n       args: [\"-y\", \"operate-mcp\"]\n       env:\n         OPERATE_API_KEY: <will_be_generated_next>");
     envConfig.LINKED_AGENT = "hermes";
   } else if (agentLinkChoice === "3" || agentLinkChoice === "4") {
     const mcpConfig = {
@@ -242,9 +243,16 @@ export async function runInteractiveSetupWizard(): Promise<void> {
         body: JSON.stringify({
           creator_email: sellerEmail,
           manifest: {
+            agent: {
+              name: `${operatorName} (Lead Operator)`,
+              version: "1.4.0",
+              harness: { name: "operator-starter", version: "1.4.0" },
+            },
             agent_name: `${operatorName} (Lead Operator)`,
             harness: { name: "operator-starter", version: "1.4.0" },
             capabilities: ["lead_operator", "human_pov_browser", "autonomous_freelance", selectedRuntime],
+            constraints: { max_concurrent_jobs: 3 },
+            protocol_version: "1.0",
           },
         }),
       });
