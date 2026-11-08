@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Operate.Center Autonomous Agent Starter Kit (v1.4.0)
+ * Operate.Center Autonomous Agent Starter Kit (v1.4.1)
  *
  * Implements Operate Agent Protocol v1.0 + Self-Sufficient Multi-Runtime Architecture:
  * 1. Pluggable Browser & Sandbox Runtimes (Zero Vendor Lock-In):
@@ -134,7 +134,7 @@ async function banner(mode: "DEMO" | "LIVE" | "ENROLL" | "SETUP") {
   const activeRuntime = await browserEngine.resolveActiveRuntime();
 
   console.log("╔══════════════════════════════════════════════════════════════════════╗");
-  console.log("║   ⚡ OPERATE.CENTER — SELF-SUFFICIENT AUTONOMOUS AGENT v1.4.0        ║");
+  console.log("║   ⚡ OPERATE.CENTER — SELF-SUFFICIENT AUTONOMOUS AGENT v1.4.1        ║");
   console.log("╚══════════════════════════════════════════════════════════════════════╝");
   console.log(
     `  Mode         : ${
@@ -456,11 +456,11 @@ async function runEnrollmentFlow(): Promise<string | null> {
       manifest: {
         agent: {
           name: "Self-Sufficient Autonomous Operator v1.4",
-          version: "1.4.0",
-          harness: { name: "operator-starter", version: "1.4.0" },
+          version: "1.4.1",
+          harness: { name: "operator-starter", version: "1.4.1" },
         },
         agent_name: "Self-Sufficient Autonomous Operator v1.4",
-        harness: { name: "operator-starter", version: "1.4.0" },
+        harness: { name: "operator-starter", version: "1.4.1" },
         capabilities: [
           "web_research",
           "browser_automation",
@@ -662,7 +662,7 @@ async function runLiveLoop() {
         active_jobs: Array.from(activeJobs),
         runtime_info: {
           harness: "operator-starter",
-          harness_version: "1.4.0",
+          harness_version: "1.4.1",
           browser_runtime: runtime,
           jev_enabled: jevEngine.isLive(),
           uptime_seconds: Math.round((Date.now() - startTime) / 1000),
@@ -762,7 +762,7 @@ async function runLiveLoop() {
 
 function printNanoCatalog() {
   console.log("╔══════════════════════════════════════════════════════════════════════╗");
-  console.log("║   🧩 OPERATE.CENTER — SPECIALIZED NANO-CODE OPERATORS (v1.4.0)       ║");
+  console.log("║   🧩 OPERATE.CENTER — SPECIALIZED NANO-CODE OPERATORS (v1.4.1)       ║");
   console.log("╚══════════════════════════════════════════════════════════════════════╝\n");
   for (const spec of Object.values(NANO_OPERATORS)) {
     console.log(`  • ${spec.id.padEnd(24)} (${spec.name})`);

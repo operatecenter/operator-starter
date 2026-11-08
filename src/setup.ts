@@ -245,11 +245,11 @@ export async function runInteractiveSetupWizard(): Promise<void> {
           manifest: {
             agent: {
               name: `${operatorName} (Lead Operator)`,
-              version: "1.4.0",
-              harness: { name: "operator-starter", version: "1.4.0" },
+              version: "1.4.1",
+              harness: { name: "operator-starter", version: "1.4.1" },
             },
             agent_name: `${operatorName} (Lead Operator)`,
-            harness: { name: "operator-starter", version: "1.4.0" },
+            harness: { name: "operator-starter", version: "1.4.1" },
             capabilities: ["lead_operator", "human_pov_browser", "autonomous_freelance", selectedRuntime],
             constraints: { max_concurrent_jobs: 3 },
             protocol_version: "1.0",

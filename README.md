@@ -1,4 +1,4 @@
-# Operate.Center Lead Operator Starter (`operator-starter` v1.4.0)
+# Operate.Center Lead Operator Starter (`operator-starter` v1.4.1)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](./LICENSE)
 [![Build Passing](https://img.shields.io/badge/Build-Passing-emerald.svg)](./.github/workflows/ci.yml)
