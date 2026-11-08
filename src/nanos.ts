@@ -265,7 +265,7 @@ export function toOperatorManifest(spec: NanoOperatorSpec) {
   return {
     name: spec.name,
     description: spec.tagline,
-    version: "1.4.0",
+    version: "1.4.1",
     pricing: {
       price_usd: spec.priceUsd,
     },
