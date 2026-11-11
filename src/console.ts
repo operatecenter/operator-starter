@@ -152,8 +152,11 @@ export class LeadOperatorConsole {
     console.log("  /model [provider/model]  — View or switch active reasoning model dynamically");
     console.log("  /skills [browse|install] — Manage skills, install plugins & workflows");
     console.log("  /status                  — View Lead Operator status, seller account & metrics");
+    console.log("  /earnings [notify]       — Check live seller earnings, Stripe Connect KYC & notify owner");
     console.log("  /gigs [publish]          — Inspect published gigs or re-publish all 5 to marketplace");
     console.log("  /orders [poll|claim <id>]— Check queued escrow orders and claim 15-min lease");
+    console.log("  /hire <opId> <jsonBrief> — Outsource work by hiring a marketplace gig as a buyer agent");
+    console.log("  /deliveries [orderId]    — Sync & organize received buyer deliveries into ~/.hermes/operate_deliveries");
     console.log("  /stream [headed|headless]— View live browser stream URL or toggle Human-POV mode");
     console.log("  /sandbox [status|run]    — Inspect or test Perplexity SPACE / MicroVM isolated sandbox");
     console.log("  /research <url>          — Autonomous web & competitor intelligence audit");
@@ -261,6 +264,126 @@ export class LeadOperatorConsole {
     console.log(`  Human-POV Mode: ${this.browserEngine.isHumanPovEnabled() ? "🟢 Enabled (Visible Natural Interaction)" : "⚪ Off"}`);
     console.log(`  Credentials   : ${this.apiKey ? `🟢 Authenticated (${this.apiKey.slice(0, 10)}...)` : "⚪ Demo / Unenrolled"}`);
     console.log(`  Revenue Split : 💸 80% Seller Share (20% Escrow Fee)\n`);
+  }
+
+  async handleEarningsCommand(subcmd?: string) {
+    if (!this.apiKey || this.apiKey === "agt_your_agent_key_here") {
+      console.log("\n🧪 Demo Mode: Set OPERATE_API_KEY (or run `npm run setup`) to check live Stripe Connect KYC & earnings.\n");
+      return;
+    }
+    try {
+      const res = await fetch(`${this.apiUrl}/api/agent/hub`, {
+        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        console.log(`\n⚠️  Could not fetch earnings: ${res.statusText}\n`);
+        return;
+      }
+      const data = (await res.json()) as any;
+      const sum = data.summary || {};
+      const sv = data.seller_verification || {};
+      console.log("\n💰 LIVE SELLER EARNINGS & STRIPE CONNECT KYC STATUS:");
+      console.log(`  • Completed Earnings : $${Number(sum.total_earnings_usd || 0).toFixed(2)} USD`);
+      console.log(`  • Pending in Escrow  : $${Number(sum.pending_escrow_usd || 0).toFixed(2)} USD`);
+      console.log(`  • Awaiting KYC Hold  : $${Number(sum.awaiting_onboarding_usd || 0).toFixed(2)} USD`);
+      console.log(
+        `  • Stripe Connect KYC : ${
+          sv.stripe_onboarding_complete
+            ? "🟢 Verified (80% Payouts Enabled)"
+            : `🟡 Unverified (${sv.grace_period_days_left ?? 90}d grace window — verify at ${sv.onboarding_url || "https://operate.center/dashboard/earnings"})`
+        }`
+      );
+      if (subcmd === "notify") {
+        await fetch(`${this.apiUrl}/api/agent/hub`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: sv.stripe_onboarding_complete
+              ? "Operate.Center Agent Earnings Update"
+              : "Action Required: Verify Stripe Connect for Operate.Center Payouts",
+            message: sv.owner_message || "Your Lead Operator checked live earnings on Operate.Center.",
+            link: "/dashboard/earnings",
+          }),
+        });
+        console.log("  📩 Sent in-app + email notification to human owner!\n");
+      } else {
+        console.log("  Tip: Run `/earnings notify` to send an in-app + email update to your human owner.\n");
+      }
+    } catch (err: any) {
+      console.log(`\n⚠️  Earnings check error: ${err.message}\n`);
+    }
+  }
+
+  async handleHireCommand(operatorId?: string, ...briefParts: string[]) {
+    if (!operatorId) {
+      console.log("\nUsage: `/hire <operator_id> [brief_json_or_text]`\n");
+      return;
+    }
+    if (!this.apiKey || this.apiKey === "agt_your_agent_key_here") {
+      console.log("\n🔑 Set OPERATE_API_KEY to hire marketplace gigs as a buyer agent.\n");
+      return;
+    }
+    const rawBrief = briefParts.join(" ").trim();
+    let inputData: Record<string, any> = { instructions: rawBrief || "Fulfill standard package requirements" };
+    if (rawBrief.startsWith("{")) {
+      try {
+        inputData = JSON.parse(rawBrief);
+      } catch {
+        // Keep as instructions string
+      }
+    }
+    try {
+      const res = await fetch(`${this.apiUrl}/api/agent/orders`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ operator_id: operatorId, input_data: inputData }),
+      });
+      const data = (await res.json()) as any;
+      if (!res.ok) {
+        console.log(`\n⚠️  Could not place buyer order: ${data.error || res.statusText}\n`);
+        return;
+      }
+      console.log(`\n🛒 Order Created (#${data.order_id || "pending"})!`);
+      if (data.checkout_url) {
+        console.log(`   👉 Checkout / Approval URL: ${data.checkout_url}\n`);
+      }
+    } catch (err: any) {
+      console.log(`\n⚠️  Hire error: ${err.message}\n`);
+    }
+  }
+
+  async handleDeliveriesCommand(orderId?: string) {
+    const vaultDir = path.resolve(
+      process.env.OPERATE_DELIVERIES_DIR || path.join(process.env.HOME || ".", ".hermes", "operate_deliveries")
+    );
+    fs.mkdirSync(vaultDir, { recursive: true });
+    if (!this.apiKey || this.apiKey === "agt_your_agent_key_here") {
+      console.log(`\n🗂️  Local Delivery Vault: ${vaultDir}`);
+      console.log("   Set OPERATE_API_KEY to sync live deliveries from purchased orders.\n");
+      return;
+    }
+    try {
+      const qs = orderId ? `?order_id=${encodeURIComponent(orderId)}&all=true` : "?all=true";
+      const res = await fetch(`${this.apiUrl}/api/agent/orders${qs}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      const data = (await res.json()) as any;
+      const orders = data.orders || [];
+      let synced = 0;
+      for (const o of orders) {
+        if (o.result_data || ["delivered", "buyer_review", "approved", "completed"].includes(String(o.status))) {
+          const folder = path.join(vaultDir, `${String(o.created_at || "").slice(0, 10) || "order"}_${o.operator_id}_${String(o.id).slice(0, 8)}`);
+          const v1 = path.join(folder, "v1");
+          fs.mkdirSync(v1, { recursive: true });
+          fs.writeFileSync(path.join(folder, "order_meta.json"), JSON.stringify(o, null, 2), "utf8");
+          fs.writeFileSync(path.join(v1, "output.json"), JSON.stringify(o.result_data || {}, null, 2), "utf8");
+          synced++;
+        }
+      }
+      console.log(`\n🗂️  Synced ${synced} delivery package(s) into ${vaultDir}\n`);
+    } catch (err: any) {
+      console.log(`\n⚠️  Delivery sync error: ${err.message}\n`);
+    }
   }
 
   handleLinkCommand() {
@@ -542,6 +665,9 @@ export class LeadOperatorConsole {
         case "/status":
           await this.handleStatusCommand();
           break;
+        case "/earnings":
+          await this.handleEarningsCommand(args[0]);
+          break;
         case "/gigs":
         case "/gig":
           await this.handleGigsCommand(args[0]);
@@ -549,6 +675,12 @@ export class LeadOperatorConsole {
         case "/orders":
         case "/order":
           await this.handleOrdersCommand(args[0], args[1]);
+          break;
+        case "/hire":
+          await this.handleHireCommand(args[0], ...args.slice(1));
+          break;
+        case "/deliveries":
+          await this.handleDeliveriesCommand(args[0]);
           break;
         case "/stream":
           await this.handleStreamCommand(args[0]);
